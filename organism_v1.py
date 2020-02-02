@@ -18,6 +18,7 @@ import matplotlib.lines as lines
 from plotting import plot_food
 from plotting import plot_organism
 
+#import plotting_pygame
 import numpy as np
 import operator
 
@@ -40,12 +41,12 @@ settings = {}
 # EVOLUTION SETTINGS
 settings['pop_size'] = 50       # number of organisms
 settings['food_num'] = 100      # number of food particles
-settings['gens'] = 50           # number of generations
+settings['gens'] = 10           # number of generations
 settings['elitism'] = 0.20      # elitism (selection bias)
 settings['mutate'] = 0.10       # mutation rate
 
 # SIMULATION SETTINGS
-settings['gen_time'] = 100      # generation length         (seconds)
+settings['gen_time'] = 10      # generation length         (seconds)
 settings['dt'] = 0.04           # simulation time step      (dt)
 settings['dr_max'] = 720        # max rotational speed      (degrees per second)
 settings['v_max'] = 0.5         # max velocity              (units per second)
@@ -57,6 +58,8 @@ settings['y_min'] = -2.0        # arena southern border
 settings['y_max'] =  2.0        # arena northern border
 
 settings['plot'] = False        # plot final generation?
+
+settings['plot_pygame'] = True  # plot final generation using pygame?
 
 # ORGANISM NEURAL NET SETTINGS
 settings['inodes'] = 1          # number of input nodes
@@ -103,6 +106,39 @@ def plot_frame(settings, organisms, foods, gen, time):
 
     plt.savefig(str(gen)+'-'+str(time)+'.png', dpi=100)
 ##    plt.show()
+
+# PLOT USING PYGAME
+def init_pygame():
+    global pygame, plotting_pygame
+    import pygame, plotting_pygame
+    pygame.init()
+
+def init_pygame_mode():
+    # = 150px
+    global screen
+    screen = pygame.display.set_mode([900, 600])
+
+def ppos(x, y):
+    # PROJECT POSITION
+    return (int(x*112+450), int(y*112+300))
+def plot_frame_pygame(settings, organisms, foods, gen, time):
+    global screen
+    
+    screen.fill((255,255,255))
+    pygame.draw.rect(screen, (0,0,0), [(175, 25), (550, 550)], 2)
+
+    for organism in organisms:
+        point = ppos(organism.x, organism.y)
+        plotting_pygame.plot_organism(point[0], point[1], organism.r, screen)
+    for food in foods:
+        point = ppos(food.x, food.y)
+        plotting_pygame.plot_food(point[0], point[1], screen)
+
+    s1 = plotting_pygame.font.render(r'GENERATION: '+str(gen), 1, (0,0,0))
+    s2 = plotting_pygame.font.render(r'T_STEP: '+str(time), 1, (0,0,0))
+    screen.blit(s1, (80, 75))
+    screen.blit(s2, (80, 150))
+    pygame.display.flip()
 
 
 def evolve(settings, organisms_old, gen):
@@ -177,13 +213,22 @@ def simulate(settings, organisms, foods, gen):
 
     total_time_steps = int(settings['gen_time'] / settings['dt'])
 
+    if settings['plot_pygame'] and gen==settings['gens']-1:
+        input("> ENTER TO SIMULATE WITH PYGAME")
+        init_pygame_mode()
     #--- CYCLE THROUGH EACH TIME STEP ---------------------+
     for t_step in range(0, total_time_steps, 1):
 
         # PLOT SIMULATION FRAME
         if settings['plot']==True and gen==settings['gens']-1:
             plot_frame(settings, organisms, foods, gen, t_step)
-
+        if settings['plot_pygame'] and gen==settings['gens']-1:
+            running = True
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    running = False
+            if not running: break
+            plot_frame_pygame(settings, organisms, foods, gen, t_step)
         # UPDATE FITNESS FUNCTION
         for food in foods:
             for org in organisms:
@@ -219,7 +264,8 @@ def simulate(settings, organisms, foods, gen):
             org.update_r(settings)
             org.update_vel(settings)
             org.update_pos(settings)
-
+    if settings['plot_pygame'] and gen==settings['gens']-1:
+        pygame.quit()
     return organisms
 
 
@@ -298,6 +344,8 @@ class organism():
 
 def run(settings):
 
+    #--- INIT PYGAME --------------------------------------+
+    if settings["plot_pygame"]: init_pygame()
     #--- POPULATE THE ENVIRONMENT WITH FOOD ---------------+
     foods = []
     for i in range(0,settings['food_num']):
